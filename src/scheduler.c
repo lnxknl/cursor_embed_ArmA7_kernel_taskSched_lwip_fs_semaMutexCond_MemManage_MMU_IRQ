@@ -110,3 +110,24 @@ scheduler_stats_t *scheduler_get_stats(void) {
 void scheduler_reset_stats(void) {
     memset(&stats, 0, sizeof(stats));
 } 
+// 创建实时任务
+realtime_params_t rt_params = {
+    .period = 100,      // 100ms周期
+    .deadline = 100,    // 100ms截止时间
+    .execution = 20     // 20ms执行时间
+};
+task_t *rt_task = task_create("rt_task", rt_task_entry, TASK_PRIORITY_REALTIME, DEFAULT_STACK_SIZE);
+scheduler_set_realtime_params(rt_task, &rt_params);
+
+// 创建普通任务（使用CFS）
+task_t *normal_task = task_create("normal_task", normal_task_entry, TASK_PRIORITY_NORMAL, DEFAULT_STACK_SIZE);
+scheduler_set_weight(normal_task, 1024);  // 设置默认权重
+
+// 创建MLFQ任务
+task_t *mlfq_task = task_create("mlfq_task", mlfq_task_entry, TASK_PRIORITY_NORMAL, DEFAULT_STACK_SIZE);
+scheduler_mlfq_init_task(mlfq_task);
+
+// 切换调度策略
+scheduler_set_policy(SCHEDULER_POLICY_REALTIME);  // 使用实时调度
+scheduler_set_policy(SCHEDULER_POLICY_FAIR);      // 使用完全公平调度
+scheduler_set_policy(SCHEDULER_POLICY_MLFQ);      // 使用多级反馈队列

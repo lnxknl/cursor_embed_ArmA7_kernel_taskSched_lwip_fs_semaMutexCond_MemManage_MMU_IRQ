@@ -13,7 +13,8 @@ BUILD_DIR = build
 
 # 编译标志
 ASFLAGS = -mcpu=cortex-a7
-CFLAGS = -mcpu=cortex-a7 -Wall -O2 -ffreestanding -nostdlib -nostartfiles -I$(INC_DIR)
+CFLAGS = -mcpu=cortex-a7 -Wall -O2 -ffreestanding -nostdlib -nostartfiles \
+         -I$(INC_DIR) -DQEMU_PLATFORM
 LDFLAGS = -T $(SRC_DIR)/linker.ld -nostdlib
 
 # 源文件
@@ -29,7 +30,7 @@ OBJ = $(AOBJ) $(COBJ)
 TARGET = $(BUILD_DIR)/kernel.elf
 TARGET_BIN = $(BUILD_DIR)/kernel.bin
 
-.PHONY: all clean qemu
+.PHONY: all clean qemu debug
 
 all: $(TARGET_BIN)
 
@@ -49,7 +50,11 @@ $(TARGET_BIN): $(TARGET)
 	$(OBJCOPY) -O binary $< $@
 
 qemu: $(TARGET_BIN)
-	qemu-system-arm -M vexpress-a9 -m 128M -nographic -kernel $(TARGET_BIN) -S -s -monitor none
+	qemu-system-arm -M vexpress-a9 -m 128M -nographic -kernel $(TARGET_BIN) -S -s
+
+debug: $(TARGET_BIN)
+	qemu-system-arm -M vexpress-a9 -m 128M -nographic -kernel $(TARGET_BIN) -S -s &
+	arm-none-eabi-gdb $(TARGET) -x gdb.script
 
 clean:
 	rm -rf $(BUILD_DIR) 

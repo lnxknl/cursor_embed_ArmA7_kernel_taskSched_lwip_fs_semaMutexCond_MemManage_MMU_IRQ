@@ -38,9 +38,26 @@ SECTIONS
         . = ALIGN(4);
     } > RAM
 
-    .stack (NOLOAD) : {
+    /* 各种模式的栈 */
+    .stack : {
         . = ALIGN(8);
-        . = . + 0x1000; /* 4KB stack */
-        _stack_top = .;
+        
+        . = . + 0x1000;
+        _fiq_stack_top = .;
+        
+        . = . + 0x1000;
+        _irq_stack_top = .;
+        
+        . = . + 0x1000;
+        _abt_stack_top = .;
+        
+        . = . + 0x1000;
+        _und_stack_top = .;
+        
+        . = . + 0x1000;
+        _sys_stack_top = .;
+        
+        . = . + 0x1000;
+        _svc_stack_top = .;
     } > RAM
 } 

@@ -4,6 +4,7 @@ MEMORY
 {
     ROM (rx)  : ORIGIN = 0x60000000, LENGTH = 1M
     RAM (rwx) : ORIGIN = 0x70000000, LENGTH = 128M
+    UNCACHED (rw) : ORIGIN = 0x80000000, LENGTH = 1M
 }
 
 SECTIONS
@@ -20,14 +21,19 @@ SECTIONS
         . = ALIGN(4);
     } > ROM
 
-    .data : AT(ADDR(.text) + SIZEOF(.text)) {
+    .data : {
         _data_start = .;
         *(.data*)
         _data_end = .;
         . = ALIGN(4);
-    } > RAM
+    } > RAM AT > ROM
 
-    _data_loadaddr = LOADADDR(.data);
+    .uncached_data : {
+        _uncached_start = .;
+        *(.uncached_data*)
+        _uncached_end = .;
+        . = ALIGN(4);
+    } > UNCACHED AT > ROM
 
     .bss : {
         . = ALIGN(4);
@@ -38,26 +44,9 @@ SECTIONS
         . = ALIGN(4);
     } > RAM
 
-    /* 各种模式的栈 */
     .stack : {
         . = ALIGN(8);
-        
         . = . + 0x1000;
-        _fiq_stack_top = .;
-        
-        . = . + 0x1000;
-        _irq_stack_top = .;
-        
-        . = . + 0x1000;
-        _abt_stack_top = .;
-        
-        . = . + 0x1000;
-        _und_stack_top = .;
-        
-        . = . + 0x1000;
-        _sys_stack_top = .;
-        
-        . = . + 0x1000;
-        _svc_stack_top = .;
+        _stack_top = .;
     } > RAM
 } 

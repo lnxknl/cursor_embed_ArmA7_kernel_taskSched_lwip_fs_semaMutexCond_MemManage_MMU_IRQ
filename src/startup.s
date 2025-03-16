@@ -5,24 +5,36 @@
 .global _vectors
 
 _vectors:
-    b _start              @ Reset
-    b _undefined          @ Undefined instruction
-    b _svc               @ Software interrupt
-    b _prefetch          @ Prefetch abort
-    b _data              @ Data abort
-    b _unused            @ Not used
-    b _irq               @ IRQ interrupt
-    b _fiq               @ FIQ interrupt
+    ldr pc, =_start          @ Reset
+    ldr pc, =_undefined      @ Undefined instruction
+    ldr pc, =_svc           @ Software interrupt
+    ldr pc, =_prefetch      @ Prefetch abort
+    ldr pc, =_data          @ Data abort
+    ldr pc, =_unused        @ Not used
+    ldr pc, =_irq          @ IRQ interrupt
+    ldr pc, =_fiq          @ FIQ interrupt
+
+_vectors_data:
+    .word _start
+    .word _undefined
+    .word _svc
+    .word _prefetch
+    .word _data
+    .word _unused
+    .word _irq
+    .word _fiq
 
 .section .text
 .align 4
 
 _start:
-    @ 设置处理器模式为SVC模式，禁用所有中断
+    @ 禁用所有中断
+    cpsid if
+
+    @ 设置处理器模式为SVC模式
     mrs r0, cpsr
     bic r0, r0, #0x1F
     orr r0, r0, #0x13
-    orr r0, r0, #0xC0    @ 禁用 IRQ 和 FIQ
     msr cpsr, r0
 
     @ 初始化栈指针

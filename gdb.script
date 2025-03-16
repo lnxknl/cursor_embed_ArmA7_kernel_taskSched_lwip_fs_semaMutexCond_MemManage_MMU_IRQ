@@ -1,7 +1,10 @@
 set architecture arm
+set arm fallback-mode arm
 target remote localhost:1234
 display/i $pc
 layout asm
 layout regs
+break *0x60000000
 break _start
+stepi
 continue 

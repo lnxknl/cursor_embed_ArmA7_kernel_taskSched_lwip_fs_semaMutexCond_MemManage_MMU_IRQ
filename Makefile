@@ -49,7 +49,7 @@ $(TARGET_BIN): $(TARGET)
 	$(OBJCOPY) -O binary $< $@
 
 qemu: $(TARGET_BIN)
-	qemu-system-arm -M vexpress-a9 -m 128M -nographic -kernel $(TARGET_BIN)
+	qemu-system-arm -M vexpress-a9 -m 128M -nographic -kernel $(TARGET_BIN) -S -s -monitor none
 
 clean:
 	rm -rf $(BUILD_DIR) 

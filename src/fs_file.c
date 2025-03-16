@@ -240,3 +240,149 @@ int fs_write(int fd, const void *buf, uint32_t count) {
     
     return bytes_written;
 } 
+
+// 文件系统使用示例
+
+void fs_test(void) {
+    // 1. 初始化文件系统
+    fs_init();
+    
+    // 2. 挂载文件系统
+    fs_mount("/dev/disk0", "/");
+    
+    // 3. 创建目录
+    fs_mkdir("/test", 0755);
+    
+    // 4. 创建和写入文件
+    int fd = fs_open("/test/hello.txt", O_CREAT | O_WRONLY);
+    if (fd >= 0) {
+        const char *message = "Hello, Embedded File System!";
+        fs_write(fd, message, strlen(message));
+        fs_close(fd);
+    }
+    
+    // 5. 读取文件
+    fd = fs_open("/test/hello.txt", O_RDONLY);
+    if (fd >= 0) {
+        char buffer[100];
+        int bytes = fs_read(fd, buffer, sizeof(buffer));
+        if (bytes > 0) {
+            buffer[bytes] = '\0';
+            printf("Read from file: %s\n", buffer);
+        }
+        fs_close(fd);
+    }
+    
+    // 6. 目录遍历
+    DIR *dir = fs_opendir("/test");
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = fs_readdir(dir)) != NULL) {
+            printf("Found file: %s\n", entry->d_name);
+        }
+        fs_closedir(dir);
+    }
+    
+    // 7. 文件重命名
+    fs_rename("/test/hello.txt", "/test/world.txt");
+    
+    // 8. 删除文件
+    fs_unlink("/test/world.txt");
+    
+    // 9. 删除目录
+    fs_rmdir("/test");
+    
+    // 10. 卸载文件系统
+    fs_unmount("/");
+}
+
+// 实际应用场景：简单的日志系统
+typedef struct {
+    int fd;
+    char filename[MAX_PATH];
+    uint32_t max_size;
+    uint32_t current_size;
+} log_file_t;
+
+log_file_t *log_open(const char *filename, uint32_t max_size) {
+    log_file_t *log = malloc(sizeof(log_file_t));
+    if (!log) return NULL;
+    
+    strncpy(log->filename, filename, MAX_PATH);
+    log->max_size = max_size;
+    log->current_size = 0;
+    
+    // 打开或创建日志文件
+    log->fd = fs_open(filename, O_CREAT | O_WRONLY | O_APPEND);
+    if (log->fd < 0) {
+        free(log);
+        return NULL;
+    }
+    
+    // 获取当前文件大小
+    struct stat st;
+    if (fs_stat(filename, &st) == 0) {
+        log->current_size = st.st_size;
+    }
+    
+    return log;
+}
+
+void log_write(log_file_t *log, const char *message) {
+    if (!log || log->fd < 0) return;
+    
+    // 检查是否需要轮转
+    if (log->current_size + strlen(message) + 1 > log->max_size) {
+        // 关闭当前文件
+        fs_close(log->fd);
+        
+        // 备份旧文件
+        char backup[MAX_PATH];
+        snprintf(backup, MAX_PATH, "%s.old", log->filename);
+        fs_rename(log->filename, backup);
+        
+        // 创建新文件
+        log->fd = fs_open(log->filename, O_CREAT | O_WRONLY);
+        log->current_size = 0;
+    }
+    
+    // 写入时间戳
+    char timestamp[32];
+    time_t now = time(NULL);
+    strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S] ", localtime(&now));
+    fs_write(log->fd, timestamp, strlen(timestamp));
+    
+    // 写入消息
+    fs_write(log->fd, message, strlen(message));
+    fs_write(log->fd, "\n", 1);
+    
+    log->current_size += strlen(timestamp) + strlen(message) + 1;
+}
+
+void log_close(log_file_t *log) {
+    if (!log) return;
+    
+    if (log->fd >= 0) {
+        fs_close(log->fd);
+    }
+    
+    free(log);
+}
+
+// 使用日志系统
+void log_system_test(void) {
+    // 创建日志文件
+    log_file_t *log = log_open("/var/log/system.log", 1024*1024); // 1MB最大大小
+    
+    // 写入一些日志
+    log_write(log, "System startup");
+    log_write(log, "Initializing devices...");
+    log_write(log, "Network connection established");
+    log_write(log, "Starting services...");
+    
+    // 模拟错误
+    log_write(log, "ERROR: Failed to start service XYZ");
+    
+    // 关闭日志
+    log_close(log);
+}

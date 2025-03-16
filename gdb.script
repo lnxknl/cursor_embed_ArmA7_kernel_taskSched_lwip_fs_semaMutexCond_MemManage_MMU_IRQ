@@ -1,0 +1,7 @@
+set architecture arm
+target remote localhost:1234
+display/i $pc
+layout asm
+layout regs
+break _start
+continue 

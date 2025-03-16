@@ -116,3 +116,184 @@ void ethernetif_input(struct netif *netif)
     eth_release_rx_buffer(buffer);
     LINK_STATS_INC(link.recv);
 } 
+// 智能家居网关应用示例
+
+// 设备状态结构
+typedef struct {
+    bool light_status;
+    int temperature;
+    int humidity;
+    bool door_locked;
+    bool window_opened;
+    int air_quality;
+} home_status_t;
+
+static home_status_t home_status;
+
+// JSON处理函数
+static char* create_status_json(void)
+{
+    static char json_buffer[512];
+    
+    snprintf(json_buffer, sizeof(json_buffer),
+             "{"
+             "\"light\": %s,"
+             "\"temperature\": %d,"
+             "\"humidity\": %d,"
+             "\"door\": %s,"
+             "\"window\": %s,"
+             "\"air_quality\": %d"
+             "}",
+             home_status.light_status ? "true" : "false",
+             home_status.temperature,
+             home_status.humidity,
+             home_status.door_locked ? "locked" : "unlocked",
+             home_status.window_opened ? "opened" : "closed",
+             home_status.air_quality);
+    
+    return json_buffer;
+}
+
+// MQTT消息处理
+static void mqtt_handle_message(const char *topic, const char *message)
+{
+    if (strcmp(topic, "home/light/set") == 0) {
+        home_status.light_status = (strcmp(message, "on") == 0);
+        // 控制实际的灯
+        control_light(home_status.light_status);
+        
+    } else if (strcmp(topic, "home/door/set") == 0) {
+        home_status.door_locked = (strcmp(message, "lock") == 0);
+        // 控制门锁
+        control_door(home_status.door_locked);
+        
+    } else if (strcmp(topic, "home/window/set") == 0) {
+        home_status.window_opened = (strcmp(message, "open") == 0);
+        // 控制窗户
+        control_window(home_status.window_opened);
+    }
+    
+    // 发布状态更新
+    mqtt_publish("home/status", create_status_json(), 0);
+}
+
+// 传感器数据采集任务
+static void sensor_task(void *arg)
+{
+    while (1) {
+        // 读取温湿度传感器
+        home_status.temperature = read_temperature();
+        home_status.humidity = read_humidity();
+        
+        // 读取空气质量传感器
+        home_status.air_quality = read_air_quality();
+        
+        // 发布传感器数据
+        char json_buffer[128];
+        
+        snprintf(json_buffer, sizeof(json_buffer),
+                "{\"temperature\": %d, \"humidity\": %d}",
+                home_status.temperature,
+                home_status.humidity);
+        mqtt_publish("home/sensor/temp_humid", json_buffer, 0);
+        
+        snprintf(json_buffer, sizeof(json_buffer),
+                "{\"value\": %d}",
+                home_status.air_quality);
+        mqtt_publish("home/sensor/air_quality", json_buffer, 0);
+        
+        // 每5秒更新一次
+        sys_msleep(5000);
+    }
+}
+
+// Web服务器处理函数
+static void handle_http_request(int sock, const char *request)
+{
+    if (strstr(request, "GET /api/status") != NULL) {
+        // 返回设备状态
+        const char *json = create_status_json();
+        
+        char response[1024];
+        snprintf(response, sizeof(response),
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json\r\n"
+                "Content-Length: %d\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "%s",
+                strlen(json), json);
+        
+        send(sock, response, strlen(response), 0);
+        
+    } else if (strstr(request, "GET /") != NULL) {
+        // 返回控制页面
+        const char *html =
+            "<!DOCTYPE html><html>"
+            "<head><title>Smart Home Control</title></head>"
+            "<body>"
+            "<h1>Smart Home Control Panel</h1>"
+            "<div id='status'></div>"
+            "<button onclick='toggleLight()'>Toggle Light</button>"
+            "<button onclick='toggleDoor()'>Toggle Door</button>"
+            "<button onclick='toggleWindow()'>Toggle Window</button>"
+            "<script>"
+            "function updateStatus() {"
+            "  fetch('/api/status')"
+            "    .then(response => response.json())"
+            "    .then(data => {"
+            "      document.getElementById('status').innerHTML = "
+            "        '<p>Light: ' + (data.light ? 'On' : 'Off') + '</p>' +"
+            "        '<p>Temperature: ' + data.temperature + '°C</p>' +"
+            "        '<p>Humidity: ' + data.humidity + '%</p>' +"
+            "        '<p>Door: ' + (data.door ? 'Locked' : 'Unlocked') + '</p>' +"
+            "        '<p>Window: ' + (data.window ? 'Opened' : 'Closed') + '</p>' +"
+            "        '<p>Air Quality: ' + data.air_quality + '</p>';"
+            "    });"
+            "}"
+            "setInterval(updateStatus, 1000);"
+            "updateStatus();"
+            "</script>"
+            "</body></html>";
+        
+        char response[2048];
+        snprintf(response, sizeof(response),
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html\r\n"
+                "Content-Length: %d\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "%s",
+                strlen(html), html);
+        
+        send(sock, response, strlen(response), 0);
+    }
+}
+
+// 主函数
+int main(void)
+{
+    // 初始化硬件
+    hardware_init();
+    
+    // 初始化网络
+    network_init();
+    
+    // 初始化设备状态
+    memset(&home_status, 0, sizeof(home_status));
+    
+    // 创建传感器任务
+    sys_thread_new("sensor", sensor_task, NULL,
+                   DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
+    
+    // 主循环
+    while (1) {
+        // 处理系统事件
+        sys_check_timeouts();
+        
+        // 其他系统任务
+        process_system_tasks();
+    }
+    
+    return 0;
+}

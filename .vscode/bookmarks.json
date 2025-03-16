@@ -1,11 +1,21 @@
 {
 	"files": [
 		{
-			"path": "src/main.c",
+			"path": "src/timer.c",
 			"bookmarks": [
 				{
-					"line": 40,
-					"column": 31,
+					"line": 14,
+					"column": 18,
+					"label": ""
+				}
+			]
+		},
+		{
+			"path": "src/task.c",
+			"bookmarks": [
+				{
+					"line": 160,
+					"column": 16,
 					"label": ""
 				}
 			]
